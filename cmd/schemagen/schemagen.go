@@ -11,7 +11,6 @@ import (
 	"log"
 	"os"
 	"path"
-	"regexp"
 	"sort"
 	"strings"
 
@@ -107,15 +106,10 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 		delete(md.Tables, name)
 	}
 
-	// Delete a user-defined type (UDT) if it is not used by any table column.
-	orphanedTypes := make(map[string]struct{})
-	for userTypeName := range md.UserTypes {
-		if !usedInTables(userTypeName, md.Tables) {
-			orphanedTypes[userTypeName] = struct{}{}
-		}
-	}
-	for typeName := range orphanedTypes {
-		delete(md.UserTypes, typeName)
+	userTypeFields := userTypeFieldTypes(md.UserTypes)
+	removeUnusedUserTypes(md, userTypeFields)
+	if err := validateMapKeyTypes(md, userTypeFields); err != nil {
+		return nil, fmt.Errorf("validate map key types: %w", err)
 	}
 
 	imports := make([]string, 0)
@@ -123,21 +117,24 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 		imports = append(imports, "github.com/playneta/gocqlx/v3")
 	}
 
-	updateImports := func(columns map[string]*gocql.ColumnMetadata) {
-		for _, c := range columns {
-			if (c.Validator == "timestamp" || c.Validator == "date" || c.Validator == "time") && !existsInSlice(imports, "time") {
+	updateImport := func(scyllaType string) {
+		for _, typeName := range scyllaTypeNames(scyllaType) {
+			if (typeName == "timestamp" || typeName == "date" || typeName == "time") && !existsInSlice(imports, "time") {
 				imports = append(imports, "time")
 			}
-			if c.Validator == "decimal" && !existsInSlice(imports, "gopkg.in/inf.v0") {
+			if typeName == "decimal" && !existsInSlice(imports, "gopkg.in/inf.v0") {
 				imports = append(imports, "gopkg.in/inf.v0")
 			}
-			// Substring match, not equality: uuid and timeuuid also reach Go through
-			// collections such as set<uuid>, which map to []gocql.UUID.
-			if (c.Validator == "duration" ||
-				strings.Contains(c.Validator, "uuid")) &&
+			if (typeName == "duration" || typeName == "uuid" || typeName == "timeuuid") &&
 				!existsInSlice(imports, "github.com/apache/cassandra-gocql-driver/v2") {
 				imports = append(imports, "github.com/apache/cassandra-gocql-driver/v2")
 			}
+		}
+	}
+
+	updateImports := func(columns map[string]*gocql.ColumnMetadata) {
+		for _, c := range columns {
+			updateImport(c.Validator)
 		}
 	}
 
@@ -152,6 +149,11 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 	for _, t := range md.Tables {
 		sort.Strings(t.OrderedColumns)
 		updateImports(t.Columns)
+	}
+	for userTypeName := range md.UserTypes {
+		for _, fieldType := range userTypeFields[userTypeName] {
+			updateImport(fieldType)
+		}
 	}
 
 	buf := &bytes.Buffer{}
@@ -211,25 +213,180 @@ func existsInSlice(s []string, v string) bool {
 	return false
 }
 
-// userTypes finds Cassandra schema types enclosed in angle brackets.
-// Calling FindAllStringSubmatch on it will return a slice of string slices containing two elements.
-// The second element contains the name of the type.
-//
-//	[["<my_type,", "my_type"] ["my_other_type>", "my_other_type"]]
-var userTypes = regexp.MustCompile(`(?:<|\s)(\w+)[>,]`) // match all types contained in set<X>, list<X>, tuple<A, B> etc.
+// userTypeFieldTypes renders every UDT field type to CQL notation, keyed by
+// UDT name. The Apache driver exposes UDT field types only as TypeInfo, while
+// the type parser works on CQL strings, as column validators carry them.
+func userTypeFieldTypes(userTypes map[string]*gocql.UserTypeMetadata) map[string][]string {
+	fieldTypes := make(map[string][]string, len(userTypes))
+	for name, userType := range userTypes {
+		cqlTypes := make([]string, 0, len(userType.FieldTypes))
+		for _, fieldType := range userType.FieldTypes {
+			cqlTypes = append(cqlTypes, typeInfoToCQL(fieldType))
+		}
+		fieldTypes[name] = cqlTypes
+	}
+	return fieldTypes
+}
+
+// removeUnusedUserTypes keeps the UDTs a table column references, directly or
+// through the fields of another kept UDT, and deletes the rest.
+func removeUnusedUserTypes(md *gocql.KeyspaceMetadata, userTypeFields map[string][]string) {
+	usedTypes := make(map[string]struct{})
+	for userTypeName := range md.UserTypes {
+		if usedInTables(userTypeName, md.Tables) {
+			addUsedUserType(userTypeName, userTypeFields, usedTypes)
+		}
+	}
+
+	for typeName := range md.UserTypes {
+		if _, ok := usedTypes[typeName]; !ok {
+			delete(md.UserTypes, typeName)
+		}
+	}
+}
+
+func addUsedUserType(typeName string, userTypeFields map[string][]string, usedTypes map[string]struct{}) {
+	if _, ok := usedTypes[typeName]; ok {
+		return
+	}
+
+	fieldTypes, ok := userTypeFields[typeName]
+	if !ok {
+		return
+	}
+
+	usedTypes[typeName] = struct{}{}
+	for _, fieldType := range fieldTypes {
+		for _, fieldTypeName := range scyllaTypeNames(fieldType) {
+			addUsedUserType(fieldTypeName, userTypeFields, usedTypes)
+		}
+	}
+}
+
+func validateMapKeyTypes(md *gocql.KeyspaceMetadata, userTypeFields map[string][]string) error {
+	for tableName, table := range md.Tables {
+		for columnName, column := range table.Columns {
+			if err := validateScyllaMapKeys(column.Validator, userTypeFields); err != nil {
+				return fmt.Errorf("table %s column %s: %w", tableName, columnName, err)
+			}
+		}
+	}
+	for typeName, userType := range md.UserTypes {
+		for i, fieldType := range userTypeFields[typeName] {
+			if err := validateScyllaMapKeys(fieldType, userTypeFields); err != nil {
+				fieldName := fmt.Sprintf("%d", i)
+				if i < len(userType.FieldNames) {
+					fieldName = userType.FieldNames[i]
+				}
+				return fmt.Errorf("UDT %s field %s: %w", typeName, fieldName, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+func validateScyllaMapKeys(s string, userTypes map[string][]string) error {
+	name, args, ok := splitTypeConstructor(strings.TrimSpace(s))
+	if !ok {
+		return nil
+	}
+
+	if name == "map" && len(args) == 2 && !isComparableScyllaType(args[0], userTypes, make(map[string]struct{})) {
+		return fmt.Errorf("unsupported non-comparable CQL map key type %q", args[0])
+	}
+
+	for _, arg := range args {
+		if err := validateScyllaMapKeys(arg, userTypes); err != nil {
+			return err
+		}
+	}
+
+	return nil
+}
+
+func isComparableScyllaType(s string, userTypes map[string][]string, seen map[string]struct{}) bool {
+	s = strings.TrimSpace(s)
+
+	if goType, ok := types[s]; ok {
+		return isComparableGoType(goType)
+	}
+
+	name, args, ok := splitTypeConstructor(s)
+	if ok {
+		switch name {
+		case "frozen":
+			return len(args) == 1 && isComparableScyllaType(args[0], userTypes, seen)
+		case "tuple":
+			for _, arg := range args {
+				if !isComparableScyllaType(arg, userTypes, seen) {
+					return false
+				}
+			}
+			return true
+		case "map", "set", "list":
+			return false
+		default:
+			return true
+		}
+	}
+
+	fieldTypes, ok := userTypes[s]
+	if !ok {
+		return true
+	}
+	if _, ok := seen[s]; ok {
+		return true
+	}
+
+	seen[s] = struct{}{}
+	defer delete(seen, s)
+
+	for _, fieldType := range fieldTypes {
+		if !isComparableScyllaType(fieldType, userTypes, seen) {
+			return false
+		}
+	}
+
+	return true
+}
+
+func scyllaTypeNames(s string) []string {
+	s = strings.TrimSpace(s)
+
+	name, args, ok := splitTypeConstructor(s)
+	if !ok {
+		return []string{s}
+	}
+
+	switch name {
+	case "frozen", "map", "set", "list", "tuple":
+		typeNames := make([]string, 0, len(args))
+		for _, arg := range args {
+			typeNames = append(typeNames, scyllaTypeNames(arg)...)
+		}
+		return typeNames
+	default:
+		return []string{s}
+	}
+}
+
+func referencesScyllaType(typeName, scyllaType string) bool {
+	for _, scyllaTypeName := range scyllaTypeNames(scyllaType) {
+		if scyllaTypeName == typeName {
+			return true
+		}
+	}
+
+	return false
+}
 
 // usedInColumns tests whether the typeName is used in any of columns of the
 // provided tables.
 func usedInColumns(typeName string, columns map[string]*gocql.ColumnMetadata) bool {
 	for _, column := range columns {
-		if typeName == column.Validator {
+		if referencesScyllaType(typeName, column.Validator) {
 			return true
-		}
-		matches := userTypes.FindAllStringSubmatch(column.Validator, -1)
-		for _, s := range matches {
-			if s[1] == typeName {
-				return true
-			}
 		}
 	}
 	return false

@@ -4,12 +4,14 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 
 	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/google/go-cmp/cmp"
 
+	"github.com/playneta/gocqlx/v3"
 	"github.com/playneta/gocqlx/v3/gocqlxtest"
 )
 
@@ -74,6 +76,10 @@ func Test_usedInTables(t *testing.T) {
 			columnValidator: "map<album, tuple<first, map<map_key, map-value>, third>>",
 			typeName:        "map_key",
 		},
+		"matches a nested map without spaces": {
+			columnValidator: "map<album,set<song>>",
+			typeName:        "song",
+		},
 	}
 
 	for name, tt := range tests {
@@ -97,6 +103,297 @@ func Test_usedInTables(t *testing.T) {
 		}
 		usedInTables("", tables)
 	})
+}
+
+// unresolvedTypeInfo stands in for the driver's unexported unknownTypeInfo: the
+// raw schema string the Apache driver keeps for a UDT field type that refers to
+// another UDT, which it cannot parse.
+type unresolvedTypeInfo string
+
+func (unresolvedTypeInfo) Type() gocql.Type                           { return gocql.TypeCustom }
+func (unresolvedTypeInfo) Zero() interface{}                          { return nil }
+func (unresolvedTypeInfo) Marshal(interface{}) ([]byte, error)        { return nil, nil }
+func (unresolvedTypeInfo) Unmarshal(data []byte, v interface{}) error { return nil }
+
+func nativeTypeInfo(typ gocql.Type) gocql.TypeInfo {
+	return gocql.NewNativeType(4, typ, "")
+}
+
+func TestRenderTemplateRetainsNestedUserTypes(t *testing.T) {
+	pkgname := *flagPkgname
+	ignoreNames := *flagIgnoreNames
+	t.Cleanup(func() {
+		*flagPkgname = pkgname
+		*flagIgnoreNames = ignoreNames
+	})
+
+	*flagPkgname = "schemagentest"
+	*flagIgnoreNames = ""
+
+	text := nativeTypeInfo(gocql.TypeText)
+	stateColumn := &gocql.ColumnMetadata{Name: "state", Validator: "frozen<state>"}
+	b, err := renderTemplate(&gocql.KeyspaceMetadata{
+		Tables: map[string]*gocql.TableMetadata{
+			"states": {
+				Name:           "states",
+				Columns:        map[string]*gocql.ColumnMetadata{"state": stateColumn},
+				OrderedColumns: []string{"state"},
+				PartitionKey:   []*gocql.ColumnMetadata{stateColumn},
+			},
+		},
+		UserTypes: map[string]*gocql.UserTypeMetadata{
+			"state": {
+				Name:       "state",
+				FieldNames: []string{"rca", "status", "rolecustom"},
+				FieldTypes: []gocql.TypeInfo{
+					unresolvedTypeInfo("frozen<set<rcas>>"),
+					unresolvedTypeInfo("frozen<incidentstatus>"),
+					unresolvedTypeInfo("frozen<map<incidentcustomuserrole, set<userid>>>"),
+				},
+			},
+			"rcas": {
+				Name:       "rcas",
+				FieldNames: []string{"id", "created", "elapsed", "score", "author"},
+				FieldTypes: []gocql.TypeInfo{
+					text,
+					nativeTypeInfo(gocql.TypeTimestamp),
+					nativeTypeInfo(gocql.TypeDuration),
+					nativeTypeInfo(gocql.TypeDecimal),
+					nativeTypeInfo(gocql.TypeUUID),
+				},
+			},
+			"incidentstatus": {
+				Name:       "incidentstatus",
+				FieldNames: []string{"id"},
+				FieldTypes: []gocql.TypeInfo{text},
+			},
+			"incidentcustomuserrole": {
+				Name:       "incidentcustomuserrole",
+				FieldNames: []string{"id"},
+				FieldTypes: []gocql.TypeInfo{text},
+			},
+			"userid": {
+				Name:       "userid",
+				FieldNames: []string{"id"},
+				FieldTypes: []gocql.TypeInfo{text},
+			},
+			"orphan": {
+				Name:       "orphan",
+				FieldNames: []string{"id"},
+				FieldTypes: []gocql.TypeInfo{text},
+			},
+		},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	source := string(b)
+	normalizedSource := strings.Join(strings.Fields(source), " ")
+	for _, want := range []string{
+		"type StateUserType struct {",
+		"Rca []RcasUserType `cql:\"rca\"`",
+		"Status IncidentstatusUserType `cql:\"status\"`",
+		"Rolecustom map[IncidentcustomuserroleUserType][]UseridUserType `cql:\"rolecustom\"`",
+		`"github.com/apache/cassandra-gocql-driver/v2"`,
+		"type RcasUserType struct {",
+		"Id string `cql:\"id\"`",
+		"Created time.Time `cql:\"created\"`",
+		"Elapsed gocql.Duration `cql:\"elapsed\"`",
+		"Score inf.Dec `cql:\"score\"`",
+		"Author gocql.UUID `cql:\"author\"`",
+		"type IncidentstatusUserType struct {",
+		"type IncidentcustomuserroleUserType struct {",
+		"type UseridUserType struct {",
+		`"gopkg.in/inf.v0"`,
+		`"time"`,
+	} {
+		if !strings.Contains(normalizedSource, want) {
+			t.Fatalf("missing generated source %q:\n%s", want, source)
+		}
+	}
+	if strings.Contains(normalizedSource, "type OrphanUserType struct {") {
+		t.Fatalf("orphan UDT should not be generated:\n%s", source)
+	}
+}
+
+func TestRenderTemplateRejectsNonComparableMapKeys(t *testing.T) {
+	pkgname := *flagPkgname
+	ignoreNames := *flagIgnoreNames
+	t.Cleanup(func() {
+		*flagPkgname = pkgname
+		*flagIgnoreNames = ignoreNames
+	})
+
+	*flagPkgname = "schemagentest"
+	*flagIgnoreNames = ""
+
+	tests := []struct {
+		name string
+		md   *gocql.KeyspaceMetadata
+		want string
+	}{
+		{
+			name: "collection key",
+			md: &gocql.KeyspaceMetadata{
+				Tables: map[string]*gocql.TableMetadata{
+					"bad_table": {
+						Name: "bad_table",
+						Columns: map[string]*gocql.ColumnMetadata{
+							"bad": {Name: "bad", Validator: "map<frozen<set<int>>, text>"},
+						},
+					},
+				},
+			},
+			want: `table bad_table column bad: unsupported non-comparable CQL map key type "frozen<set<int>>"`,
+		},
+		{
+			name: "UDT key with collection field",
+			md: &gocql.KeyspaceMetadata{
+				Tables: map[string]*gocql.TableMetadata{
+					"states": {
+						Name: "states",
+						Columns: map[string]*gocql.ColumnMetadata{
+							"state": {Name: "state", Validator: "state"},
+						},
+					},
+				},
+				UserTypes: map[string]*gocql.UserTypeMetadata{
+					"state": {
+						Name:       "state",
+						FieldNames: []string{"roles"},
+						FieldTypes: []gocql.TypeInfo{unresolvedTypeInfo("map<frozen<role>, text>")},
+					},
+					"role": {
+						Name:       "role",
+						FieldNames: []string{"ids"},
+						FieldTypes: []gocql.TypeInfo{gocql.NewNativeType(4, gocql.TypeSet, "text")},
+					},
+				},
+			},
+			want: `UDT state field roles: unsupported non-comparable CQL map key type "frozen<role>"`,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := renderTemplate(tt.md)
+			if err == nil {
+				t.Fatal("expected error")
+			}
+			if !strings.Contains(err.Error(), tt.want) {
+				t.Fatalf("unexpected error: %v", err)
+			}
+		})
+	}
+}
+
+func TestGeneratedUserTypesRoundTripNestedUDTs(t *testing.T) {
+	// The Apache driver builds collection TypeInfo only from a type string, and a
+	// UDT element only from its Java marshal class form.
+	javaUDT := func(name string) string {
+		return fmt.Sprintf("org.apache.cassandra.db.marshal.UserType(ks,%x,%x:org.apache.cassandra.db.marshal.UTF8Type)", name, "id")
+	}
+	stateType := gocql.UDTTypeInfo{
+		Name: "state",
+		Elements: []gocql.UDTField{
+			{
+				Name: "rca",
+				Type: gocql.NewNativeType(4, gocql.TypeSet, javaUDT("rcas")),
+			},
+			{
+				Name: "status",
+				Type: gocql.UDTTypeInfo{
+					Name:     "incidentstatus",
+					Elements: []gocql.UDTField{{Name: "id", Type: nativeTypeInfo(gocql.TypeText)}},
+				},
+			},
+			{
+				Name: "rolecustom",
+				Type: gocql.NewNativeType(4, gocql.TypeMap,
+					javaUDT("incidentcustomuserrole")+", org.apache.cassandra.db.marshal.SetType("+javaUDT("userid")+")"),
+			},
+		},
+	}
+
+	original := generatedStateUserType{
+		Rca:    []generatedRcasUserType{{Id: "rca-1"}},
+		Status: generatedIncidentstatusUserType{Id: "status-1"},
+		Rolecustom: map[generatedIncidentcustomuserroleUserType][]generatedUseridUserType{
+			{Id: "role-1"}: {{Id: "user-1"}},
+		},
+	}
+
+	data, err := gocql.Marshal(stateType, newTestGocqlxUDT(original))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	var decoded generatedStateUserType
+	if err := gocql.Unmarshal(stateType, data, newTestGocqlxUDT(&decoded)); err != nil {
+		t.Fatal(err)
+	}
+
+	if diff := cmp.Diff(original, decoded); diff != "" {
+		t.Fatal(diff)
+	}
+}
+
+type testGocqlxUDT struct {
+	field map[string]reflect.Value
+}
+
+func newTestGocqlxUDT(value interface{}) testGocqlxUDT {
+	v := reflect.ValueOf(value)
+	for v.Kind() == reflect.Ptr {
+		v = v.Elem()
+	}
+	return testGocqlxUDT{
+		field: gocqlx.DefaultMapper.FieldMap(v),
+	}
+}
+
+func (u testGocqlxUDT) MarshalUDT(name string, info gocql.TypeInfo) ([]byte, error) {
+	value, ok := u.field[name]
+	if ok {
+		return gocql.Marshal(info, value.Interface())
+	}
+	return nil, nil
+}
+
+func (u testGocqlxUDT) UnmarshalUDT(name string, info gocql.TypeInfo, data []byte) error {
+	value, ok := u.field[name]
+	if ok {
+		return gocql.Unmarshal(info, data, value.Addr().Interface())
+	}
+	return nil
+}
+
+type generatedStateUserType struct {
+	gocqlx.UDT
+	Rca        []generatedRcasUserType                                               `cql:"rca"`
+	Status     generatedIncidentstatusUserType                                       `cql:"status"`
+	Rolecustom map[generatedIncidentcustomuserroleUserType][]generatedUseridUserType `cql:"rolecustom"`
+}
+
+type generatedRcasUserType struct {
+	gocqlx.UDT
+	Id string `cql:"id"`
+}
+
+type generatedIncidentstatusUserType struct {
+	gocqlx.UDT
+	Id string `cql:"id"`
+}
+
+type generatedIncidentcustomuserroleUserType struct {
+	gocqlx.UDT
+	Id string `cql:"id"`
+}
+
+type generatedUseridUserType struct {
+	gocqlx.UDT
+	Id string `cql:"id"`
 }
 
 func assertDiff(t *testing.T, actual []byte, goldenFile string) {

@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+	"reflect"
 	"strings"
 
 	gocql "github.com/apache/cassandra-gocql-driver/v2"
@@ -64,6 +65,15 @@ func typeInfoToCQL(t gocql.TypeInfo) string {
 
 	if name, ok := cqlTypeNames[t.Type()]; ok {
 		return name
+	}
+
+	// The driver cannot resolve a UDT referenced from a UDT field, such as
+	// frozen<other_udt> or set<frozen<other_udt>>, and keeps the raw schema
+	// string in an unexported string-kinded TypeInfo of type TypeCustom.
+	if t.Type() == gocql.TypeCustom {
+		if v := reflect.ValueOf(t); v.Kind() == reflect.String {
+			return v.String()
+		}
 	}
 
 	// A type the driver knows but this table does not is a generation bug, not a
