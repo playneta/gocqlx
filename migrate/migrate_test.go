@@ -16,9 +16,9 @@ import (
 
 	"github.com/psanford/memfs"
 
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/gocqlxtest"
-	"github.com/scylladb/gocqlx/v3/migrate"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/gocqlxtest"
+	"github.com/playneta/gocqlx/migrate"
 )
 
 var migrateSchema = `

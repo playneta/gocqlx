@@ -6,11 +6,11 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/qb"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/qb"
 )
 
 var flagCluster = flag.String("cluster", "127.0.0.1", "a comma-separated list of host:port or host tuples")

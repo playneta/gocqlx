@@ -11,12 +11,12 @@ import (
 	"reflect"
 	"testing"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/gocqlxtest"
-	"github.com/scylladb/gocqlx/v3/qb"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/gocqlxtest"
+	"github.com/playneta/gocqlx/qb"
 )
 
 func TestBatch(t *testing.T) {

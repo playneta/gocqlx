@@ -17,10 +17,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/qb"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/qb"
 )
 
 // DefaultAwaitSchemaAgreement controls whether checking for cluster schema agreement

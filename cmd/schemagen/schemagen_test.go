@@ -7,10 +7,10 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/scylladb/gocqlx/v3/gocqlxtest"
+	"github.com/playneta/gocqlx/gocqlxtest"
 )
 
 var flagUpdate = flag.Bool("update", false, "update golden file")

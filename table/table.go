@@ -7,8 +7,8 @@ package table
 import (
 	"context"
 
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/qb"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/qb"
 )
 
 // Metadata represents table schema.

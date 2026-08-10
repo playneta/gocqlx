@@ -7,7 +7,7 @@ package gocqlx
 import (
 	"context"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 )
 
 // This file contains wrappers around gocql.Query that make Queryx expose the
@@ -145,7 +145,7 @@ func (q *Queryx) PageState(state []byte) *Queryx {
 // CAS operations which do not end in Cas.
 //
 // See https://issues.apache.org/jira/browse/CASSANDRA-11099
-// https://github.com/gocql/gocql/issues/612
+// https://github.com/apache/cassandra-gocql-driver/v2/issues/612
 func (q *Queryx) NoSkipMetadata() *Queryx {
 	q.Query.NoSkipMetadata()
 	return q

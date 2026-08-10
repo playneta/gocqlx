@@ -10,7 +10,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/scylladb/gocqlx/v3/qb"
+	"github.com/playneta/gocqlx/qb"
 )
 
 func TestTableGet(t *testing.T) {

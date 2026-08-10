@@ -15,10 +15,10 @@ import (
 	"sort"
 	"strings"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 
-	"github.com/scylladb/gocqlx/v3"
-	_ "github.com/scylladb/gocqlx/v3/table"
+	"github.com/playneta/gocqlx"
+	_ "github.com/playneta/gocqlx/table"
 )
 
 var defaultClusterConfig = gocql.NewCluster()
@@ -132,7 +132,7 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 
 	imports := make([]string, 0)
 	if len(md.Types) != 0 {
-		imports = append(imports, "github.com/scylladb/gocqlx/v3")
+		imports = append(imports, "github.com/playneta/gocqlx")
 	}
 
 	updateImports := func(columns map[string]*gocql.ColumnMetadata) {
@@ -143,8 +143,8 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 			if c.Type == "decimal" && !existsInSlice(imports, "gopkg.in/inf.v0") {
 				imports = append(imports, "gopkg.in/inf.v0")
 			}
-			if c.Type == "duration" && !existsInSlice(imports, "github.com/gocql/gocql") {
-				imports = append(imports, "github.com/gocql/gocql")
+			if c.Type == "duration" && !existsInSlice(imports, "github.com/apache/cassandra-gocql-driver/v2") {
+				imports = append(imports, "github.com/apache/cassandra-gocql-driver/v2")
 			}
 		}
 	}

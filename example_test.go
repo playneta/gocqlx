@@ -13,14 +13,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 	"golang.org/x/sync/errgroup"
 	"gopkg.in/inf.v0"
 
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/gocqlxtest"
-	"github.com/scylladb/gocqlx/v3/qb"
-	"github.com/scylladb/gocqlx/v3/table"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/gocqlxtest"
+	"github.com/playneta/gocqlx/qb"
+	"github.com/playneta/gocqlx/table"
 )
 
 // Running examples locally:

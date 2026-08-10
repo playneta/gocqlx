@@ -12,9 +12,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 
-	"github.com/scylladb/gocqlx/v3"
+	"github.com/playneta/gocqlx"
 )
 
 var (

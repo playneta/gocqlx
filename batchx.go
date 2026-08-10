@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/gocql/gocql"
+	"github.com/apache/cassandra-gocql-driver/v2"
 )
 
 // Batch is a wrapper around gocql.Batch

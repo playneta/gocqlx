@@ -3,9 +3,9 @@
 package schemagentest
 
 import (
-	"github.com/gocql/gocql"
-	"github.com/scylladb/gocqlx/v3"
-	"github.com/scylladb/gocqlx/v3/table"
+	"github.com/apache/cassandra-gocql-driver/v2"
+	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/table"
 )
 
 // Table models.
