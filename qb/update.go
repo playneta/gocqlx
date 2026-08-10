@@ -12,7 +12,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 // assignment specifies an assignment in a set operation.

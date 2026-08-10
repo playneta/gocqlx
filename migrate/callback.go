@@ -8,7 +8,7 @@ import (
 	"context"
 	"errors"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 // CallbackEvent specifies type of the event when calling CallbackFunc.

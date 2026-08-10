@@ -1,6 +1,6 @@
 # Fork notes
 
-`github.com/playneta/gocqlx` is a fork of [scylladb/gocqlx](https://github.com/scylladb/gocqlx)
+`github.com/playneta/gocqlx/v3` is a fork of [scylladb/gocqlx](https://github.com/scylladb/gocqlx)
 **v3.0.4**, retargeted from the ScyllaDB gocql fork to the Apache driver
 [`github.com/apache/cassandra-gocql-driver/v2`](https://github.com/apache/cassandra-gocql-driver) **v2.1.2**.
 
@@ -24,7 +24,7 @@ Upstream tracking issue: [apache/cassandra-gocql-driver#1905](https://github.com
 
 Beyond the mechanical import rewrite (`github.com/gocql/gocql` →
 `github.com/apache/cassandra-gocql-driver/v2`, `github.com/scylladb/gocqlx/v3` →
-`github.com/playneta/gocqlx`):
+`github.com/playneta/gocqlx/v3`):
 
 ### `queryx.go`, `batchx.go` — removed pooling and ScyllaDB-only methods
 

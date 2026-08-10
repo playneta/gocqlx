@@ -9,7 +9,7 @@ import (
 
 	"github.com/apache/cassandra-gocql-driver/v2"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 func BenchmarkCompileNamedQuery(b *testing.B) {

@@ -14,9 +14,9 @@ import (
 	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/playneta/gocqlx"
-	"github.com/playneta/gocqlx/gocqlxtest"
-	"github.com/playneta/gocqlx/qb"
+	"github.com/playneta/gocqlx/v3"
+	"github.com/playneta/gocqlx/v3/gocqlxtest"
+	"github.com/playneta/gocqlx/v3/qb"
 )
 
 func TestBatch(t *testing.T) {

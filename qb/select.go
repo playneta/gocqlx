@@ -12,7 +12,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 // Order specifies sorting order.

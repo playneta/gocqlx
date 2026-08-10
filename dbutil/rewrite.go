@@ -5,8 +5,8 @@
 package dbutil
 
 import (
-	"github.com/playneta/gocqlx"
-	"github.com/playneta/gocqlx/table"
+	"github.com/playneta/gocqlx/v3"
+	"github.com/playneta/gocqlx/v3/table"
 )
 
 // RewriteTable rewrites src table to dst table.

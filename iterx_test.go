@@ -19,9 +19,9 @@ import (
 	"github.com/google/go-cmp/cmp/cmpopts"
 	"gopkg.in/inf.v0"
 
-	"github.com/playneta/gocqlx"
-	"github.com/playneta/gocqlx/gocqlxtest"
-	"github.com/playneta/gocqlx/qb"
+	"github.com/playneta/gocqlx/v3"
+	"github.com/playneta/gocqlx/v3/gocqlxtest"
+	"github.com/playneta/gocqlx/v3/qb"
 )
 
 type FullName struct {

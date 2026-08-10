@@ -21,7 +21,9 @@ cd "$(dirname "$0")/.."
 readonly OLD_DRIVER="github.com/gocql/gocql"
 readonly NEW_DRIVER="github.com/apache/cassandra-gocql-driver/v2"
 readonly OLD_MODULE="github.com/scylladb/gocqlx/v3"
-readonly NEW_MODULE="github.com/playneta/gocqlx"
+# Keeps the /v3 major suffix: this fork tracks upstream v3.x, and Go's semantic
+# import versioning would otherwise ignore every v3 tag we publish.
+readonly NEW_MODULE="github.com/playneta/gocqlx/v3"
 
 # perl rather than sed: -i behaves the same on macOS and Linux.
 find . -path ./.git -prune -o \
@@ -44,7 +46,7 @@ if [ -f "${TESTDATA}" ]; then
 		-droprequire "${OLD_MODULE}" \
 		-dropreplace "${OLD_MODULE}" \
 		-require "${NEW_DRIVER}@v2.1.2" \
-		-require "${NEW_MODULE}@v0.0.0" \
+		-require "${NEW_MODULE}@v3.0.0" \
 		-replace "${NEW_MODULE}=../../.."
 fi
 

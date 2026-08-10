@@ -7,8 +7,8 @@ package table
 import (
 	"context"
 
-	"github.com/playneta/gocqlx"
-	"github.com/playneta/gocqlx/qb"
+	"github.com/playneta/gocqlx/v3"
+	"github.com/playneta/gocqlx/v3/qb"
 )
 
 // Metadata represents table schema.

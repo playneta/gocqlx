@@ -10,7 +10,7 @@ import (
 	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/google/go-cmp/cmp"
 
-	"github.com/playneta/gocqlx/gocqlxtest"
+	"github.com/playneta/gocqlx/v3/gocqlxtest"
 )
 
 var flagUpdate = flag.Bool("update", false, "update golden file")

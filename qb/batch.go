@@ -10,7 +10,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 // BATCH reference:

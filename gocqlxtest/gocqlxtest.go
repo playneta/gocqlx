@@ -15,7 +15,7 @@ import (
 	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/apache/cassandra-gocql-driver/v2/snappy"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 var (

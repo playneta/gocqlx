@@ -12,7 +12,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/playneta/gocqlx"
+	"github.com/playneta/gocqlx/v3"
 )
 
 // initializer specifies an value for a column in an insert operation.

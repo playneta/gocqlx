@@ -17,8 +17,8 @@ import (
 
 	"github.com/apache/cassandra-gocql-driver/v2"
 
-	"github.com/playneta/gocqlx"
-	_ "github.com/playneta/gocqlx/table"
+	"github.com/playneta/gocqlx/v3"
+	_ "github.com/playneta/gocqlx/v3/table"
 )
 
 var defaultClusterConfig = gocql.NewCluster()
@@ -120,7 +120,7 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 
 	imports := make([]string, 0)
 	if len(md.UserTypes) != 0 {
-		imports = append(imports, "github.com/playneta/gocqlx")
+		imports = append(imports, "github.com/playneta/gocqlx/v3")
 	}
 
 	updateImports := func(columns map[string]*gocql.ColumnMetadata) {

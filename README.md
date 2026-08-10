@@ -1,10 +1,10 @@
-> **Fork.** This is `github.com/playneta/gocqlx`, a fork of
+> **Fork.** This is `github.com/playneta/gocqlx/v3`, a fork of
 > [scylladb/gocqlx](https://github.com/scylladb/gocqlx) v3.0.4 retargeted to the Apache
 > driver `github.com/apache/cassandra-gocql-driver/v2`. See [FORK.md](FORK.md) for what
 > changed and why. Upstream documentation below still applies, but substitute this
-> module path for `github.com/playneta/gocqlx`.
+> module path for `github.com/playneta/gocqlx/v3`.
 
-# 🚀 GocqlX [![GoDoc](https://pkg.go.dev/badge/github.com/playneta/gocqlx.svg)](https://pkg.go.dev/github.com/playneta/gocqlx) [![Go Report Card](https://goreportcard.com/badge/github.com/scylladb/gocqlx)](https://goreportcard.com/report/github.com/scylladb/gocqlx) [![Build Status](https://travis-ci.org/scylladb/gocqlx.svg?branch=master)](https://travis-ci.org/scylladb/gocqlx)
+# 🚀 GocqlX [![GoDoc](https://pkg.go.dev/badge/github.com/playneta/gocqlx/v3.svg)](https://pkg.go.dev/github.com/playneta/gocqlx/v3) [![Go Report Card](https://goreportcard.com/badge/github.com/scylladb/gocqlx)](https://goreportcard.com/report/github.com/scylladb/gocqlx) [![Build Status](https://travis-ci.org/scylladb/gocqlx.svg?branch=master)](https://travis-ci.org/scylladb/gocqlx)
 
 GocqlX makes working with Scylla easy and less error-prone.
 It’s inspired by [Sqlx](https://github.com/jmoiron/sqlx), a tool for working with SQL databases, but it goes beyond what Sqlx provides.
@@ -133,7 +133,7 @@ t.Log(people)
 Installation
 
 ```bash
-go get -u "github.com/playneta/gocqlx/cmd/schemagen"
+go get -u "github.com/playneta/gocqlx/v3/cmd/schemagen"
 ```
 
 Usage:
@@ -164,7 +164,7 @@ Generates `models/models.go` as follows:
 
 package models
 
-import "github.com/playneta/gocqlx/table"
+import "github.com/playneta/gocqlx/v3/table"
 
 // Table models.
 var (

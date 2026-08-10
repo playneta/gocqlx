@@ -1,4 +1,4 @@
-module github.com/playneta/gocqlx
+module github.com/playneta/gocqlx/v3
 
 go 1.26.2
 

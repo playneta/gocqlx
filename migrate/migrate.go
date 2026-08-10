@@ -19,8 +19,8 @@ import (
 
 	"github.com/apache/cassandra-gocql-driver/v2"
 
-	"github.com/playneta/gocqlx"
-	"github.com/playneta/gocqlx/qb"
+	"github.com/playneta/gocqlx/v3"
+	"github.com/playneta/gocqlx/v3/qb"
 )
 
 // DefaultAwaitSchemaAgreement controls whether checking for cluster schema agreement
