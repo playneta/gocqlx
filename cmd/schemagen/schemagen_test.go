@@ -196,7 +196,14 @@ func runSchemagen(t *testing.T, pkgname string) []byte {
 		t.Fatal(err)
 	}
 	keyspace := "schemagen"
+
+	// Upstream hardcodes 127.0.1.1 here, which only resolves on its own CI. Reuse
+	// the -cluster flag that gocqlxtest registers so the generator runs against
+	// the same node as createTestSchema above.
 	cl := "127.0.1.1"
+	if f := flag.Lookup("cluster"); f != nil {
+		cl = f.Value.String()
+	}
 
 	flagCluster = &cl
 	flagKeyspace = &keyspace

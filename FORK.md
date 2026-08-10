@@ -136,6 +136,23 @@ Additionally the following was exercised against live Cassandra 5.0.8:
 - `cmd/schemagen` against a keyspace with a UDT, collections, a `decimal`, and a
   materialized view
 
-`cmd/schemagen`'s golden-file test (`TestSchemagen`) needs a live cluster and its
-`testdata/` fixtures still carry the upstream index/view layout; regenerate them with
-`go test ./cmd/schemagen -update` against a Cassandra instance before relying on it.
+`cmd/schemagen`'s golden-file test needs a live cluster, so it is not part of a plain
+`go test ./...`:
+
+```bash
+go test ./cmd/schemagen -cluster=127.0.0.1:9042      # add -update to regenerate
+```
+
+It passes against Cassandra, and the regenerated `testdata/models.go` is **byte-identical
+to upstream's** — the retargeted generator reproduces upstream output exactly for that
+schema, UDT and `duration` column included. `runSchemagen` was changed to honour the
+`-cluster` flag; upstream hardcodes `127.0.1.1`, which only resolves on its own CI.
+
+`testdata/no_ignore_indexes/` was removed along with the `-ignore-indexes` flag, since the
+Apache driver exposes no index metadata for the generator to act on.
+
+The golden fixture is **Cassandra-specific**, so this one test is expected to fail against
+ScyllaDB. Scylla backs secondary indexes with materialized views, so `system_schema.views`
+reports an extra `songs_title_index` that Cassandra does not have and the generator dutifully
+emits a `SongsTitleIndex` model for it. That is schemagen reflecting a real schema
+difference, not a defect. Every other suite passes on both servers.
