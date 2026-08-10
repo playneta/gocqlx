@@ -245,7 +245,6 @@ func applyMigration(ctx context.Context, session gocqlx.Session, f fs.FS, path s
 	).ToCql()
 
 	update := session.ContextQuery(ctx, stmt, names)
-	defer update.Release()
 
 	if DefaultAwaitSchemaAgreement.ShouldAwait(AwaitSchemaAgreementBeforeEachFile) {
 		if err = session.AwaitSchemaAgreement(ctx); err != nil {

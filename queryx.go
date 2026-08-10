@@ -10,7 +10,6 @@ import (
 	"fmt"
 	"reflect"
 	"strconv"
-	"time"
 
 	"github.com/apache/cassandra-gocql-driver/v2"
 	"github.com/scylladb/go-reflectx"
@@ -148,28 +147,6 @@ func (q *Queryx) BindStructMap(arg0 interface{}, arg1 map[string]interface{}) *Q
 	return q
 }
 
-// GetRequestTimeout returns time driver waits for single server response
-// This timeout is applied to preparing statement request and for query execution requests
-func (q *Queryx) GetRequestTimeout() time.Duration {
-	return q.Query.GetRequestTimeout()
-}
-
-// SetRequestTimeout sets time driver waits for server to respond
-// This timeout is applied to preparing statement request and for query execution requests
-func (q *Queryx) SetRequestTimeout(timeout time.Duration) *Queryx {
-	q.Query.SetRequestTimeout(timeout)
-	return q
-}
-
-// SetHostID allows to define the host the query should be executed against. If the
-// host was filtered or otherwise unavailable, then the query will error. If an empty
-// string is sent, the default behavior, using the configured HostSelectionPolicy will
-// be used. A hostID can be obtained from HostInfo.HostID() after calling GetHosts().
-func (q *Queryx) SetHostID(hostID string) *Queryx {
-	q.Query.SetHostID(hostID)
-	return q
-}
-
 func (q *Queryx) bindStructArgs(arg0 interface{}, arg1 map[string]interface{}) ([]interface{}, error) {
 	arglist := make([]interface{}, 0, len(q.Names))
 
@@ -258,10 +235,10 @@ func (q *Queryx) Exec() error {
 	return q.Query.Exec()
 }
 
-// ExecRelease calls Exec and releases the query, a released query cannot be
-// reused.
+// ExecRelease calls Exec.
+//
+// Deprecated: gocql v2 dropped query pooling, so nothing is released.
 func (q *Queryx) ExecRelease() error {
-	defer q.Release()
 	return q.Exec()
 }
 
@@ -280,10 +257,10 @@ func (q *Queryx) ExecCAS() (applied bool, err error) {
 	return iter.applied, iter.Close()
 }
 
-// ExecCASRelease calls ExecCAS and releases the query, a released query cannot be
-// reused.
+// ExecCASRelease calls ExecCAS.
+//
+// Deprecated: gocql v2 dropped query pooling, so nothing is released.
 func (q *Queryx) ExecCASRelease() (bool, error) {
-	defer q.Release()
 	return q.ExecCAS()
 }
 
@@ -307,20 +284,34 @@ func (q *Queryx) Get(dest interface{}) error {
 	return q.Iter().Get(dest)
 }
 
-// GetRelease calls Get and releases the query, a released query cannot be
-// reused.
+// GetRelease calls Get.
+//
+// Deprecated: gocql v2 dropped query pooling, so nothing is released.
 func (q *Queryx) GetRelease(dest interface{}) error {
-	defer q.Release()
 	return q.Get(dest)
 }
 
-// GetCAS executes a lightweight transaction.
-// If the transaction fails because the existing values did not match,
-// the previous values will be stored in dest object.
-// See: https://docs.scylladb.com/using-scylla/lwt/ for more details.
+// GetCAS executes a lightweight transaction and reports whether it was applied.
+//
+// dest holds exactly what the server sent back, and nothing else: it is reset
+// before the scan, so a field is populated only if the row really carried it.
+//
+// Cassandra returns the conflicting row only when the transaction is NOT
+// applied. On an applied transaction it sends back just [applied], so dest is
+// left zeroed — there is no pre-image to read, and no way to obtain one from the
+// transaction itself. Read it with a separate query if you need it, keeping in
+// mind that such a read is not part of the transaction.
+//
+// ScyllaDB additionally returns the pre-image on an applied transaction, so code
+// written against Scylla that reads dest after applied == true will see zero
+// values here. Branch on applied instead.
 func (q *Queryx) GetCAS(dest interface{}) (applied bool, err error) {
 	if q.err != nil {
 		return false, q.err
+	}
+
+	if err := zeroDest(dest); err != nil {
+		return false, err
 	}
 
 	q.NoSkipMetadata()
@@ -332,10 +323,30 @@ func (q *Queryx) GetCAS(dest interface{}) (applied bool, err error) {
 	return iter.applied, iter.Close()
 }
 
-// GetCASRelease calls GetCAS and releases the query, a released query cannot be
-// reused.
+// zeroDest resets dest so that a CAS scan cannot leave the caller's own input in
+// place and have it read back as though the server returned it.
+func zeroDest(dest interface{}) error {
+	v := reflect.ValueOf(dest)
+	if v.Kind() != reflect.Ptr {
+		return fmt.Errorf("expected a pointer but got %T", dest)
+	}
+	if v.IsNil() {
+		return errors.New("expected a pointer but got nil")
+	}
+
+	elem := v.Elem()
+	if !elem.CanSet() {
+		return fmt.Errorf("cannot reset %T", dest)
+	}
+	elem.SetZero()
+
+	return nil
+}
+
+// GetCASRelease calls GetCAS.
+//
+// Deprecated: gocql v2 dropped query pooling, so nothing is released.
 func (q *Queryx) GetCASRelease(dest interface{}) (bool, error) {
-	defer q.Release()
 	return q.GetCAS(dest)
 }
 
@@ -360,10 +371,10 @@ func (q *Queryx) Select(dest interface{}) error {
 	return q.Iter().Select(dest)
 }
 
-// SelectRelease calls Select and releases the query, a released query cannot be
-// reused.
+// SelectRelease calls Select.
+//
+// Deprecated: gocql v2 dropped query pooling, so nothing is released.
 func (q *Queryx) SelectRelease(dest interface{}) error {
-	defer q.Release()
 	return q.Select(dest)
 }
 

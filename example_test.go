@@ -651,7 +651,6 @@ func pagingForwardPaging(t *testing.T, session gocqlx.Session) {
 
 	getUserVideos := func(userID int, page []byte) (userVideos []Video, nextPage []byte, err error) {
 		q := videoTable.SelectQuery(session).Bind(userID)
-		defer q.Release()
 		q.PageState(page)
 		q.PageSize(itemsPerPage)
 
@@ -761,7 +760,6 @@ func pagingEfficientFullTableScan(t *testing.T, session gocqlx.Session) {
 			return err
 		}
 		q := session.Query(stmt, names)
-		defer q.Release()
 
 		var v Video
 		for {

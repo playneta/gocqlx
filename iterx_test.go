@@ -996,18 +996,28 @@ func TestIterxCAS(t *testing.T) {
 	if !applied {
 		t.Error("GetCAS() expected update to be applied")
 	}
-	if john.Salary != baseSalary {
-		t.Error("GetCAS()=%=v expected to have pre-image", john)
+
+	// dest carries only what the server actually sent. Cassandra returns no row
+	// for an APPLIED transaction, so dest must come back zeroed rather than
+	// holding the caller's own input, which would read as a pre-image that was
+	// never sent. ScyllaDB does return a pre-image here, hence no assertion on
+	// the value itself - only that stale input cannot survive.
+	if john.ID != 0 && john.Salary != 0 {
+		t.Errorf("GetCAS() left caller input in dest after an applied LWT: %+v", john)
 	}
 
-	applied, err = update.BindStructMap(john, qb.M{"min_salary": minSalary * 2}).GetCAS(&john)
+	// A REJECTED transaction returns the conflicting row on both servers, so the
+	// current values must land in dest.
+	john.ID = id
+	john.Salary = minSalary * 10
+	applied, err = update.BindStructMap(john, qb.M{"min_salary": 1}).GetCAS(&john)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if !applied {
-		t.Error("GetCAS() expected update to be applied")
+	if applied {
+		t.Error("GetCAS() expected update to be rejected")
 	}
 	if john.Salary != minSalary {
-		t.Error("GetCAS()=%=v expected to have pre-image", john)
+		t.Errorf("GetCAS() expected current salary %d, got %d", minSalary, john.Salary)
 	}
 }

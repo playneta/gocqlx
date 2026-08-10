@@ -26,18 +26,8 @@ func TestSchemagen(t *testing.T) {
 		"label",
 	}, ",")
 
-	// NOTE Only this generated models is used in real tests.
-	t.Run("IgnoreIndexes", func(t *testing.T) {
-		*flagIgnoreIndexes = true
-		b := runSchemagen(t, "schemagentest")
-		assertDiff(t, b, "testdata/models.go")
-	})
-
-	t.Run("NoIgnoreIndexes", func(t *testing.T) {
-		*flagIgnoreIndexes = false
-		b := runSchemagen(t, "schemagentest")
-		assertDiff(t, b, "testdata/no_ignore_indexes/models.go")
-	})
+	b := runSchemagen(t, "schemagentest")
+	assertDiff(t, b, "testdata/models.go")
 }
 
 func Test_usedInTables(t *testing.T) {
@@ -91,7 +81,7 @@ func Test_usedInTables(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			tables := map[string]*gocql.TableMetadata{
 				"table": {Columns: map[string]*gocql.ColumnMetadata{
-					"column": {Type: tt.columnValidator},
+					"column": {Validator: tt.columnValidator},
 				}},
 			}
 			if !usedInTables(tt.typeName, tables) {
@@ -103,7 +93,7 @@ func Test_usedInTables(t *testing.T) {
 	t.Run("doesn't panic with empty type name", func(t *testing.T) {
 		tables := map[string]*gocql.TableMetadata{
 			"table": {Columns: map[string]*gocql.ColumnMetadata{
-				"column": {Type: "map<text, album>"},
+				"column": {Validator: "map<text, album>"},
 			}},
 		}
 		usedInTables("", tables)

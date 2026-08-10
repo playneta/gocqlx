@@ -55,7 +55,6 @@ func BenchmarkBaseGocqlInsert(b *testing.B) {
 
 	stmt, _ := qb.Insert("gocqlx_test.bench_person").Columns(benchPersonCols...).ToCql()
 	q := session.Session.Query(stmt)
-	defer q.Release()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -78,7 +77,6 @@ func BenchmarkGocqlxInsert(b *testing.B) {
 
 	stmt, names := qb.Insert("gocqlx_test.bench_person").Columns(benchPersonCols...).ToCql()
 	q := session.Query(stmt, names)
-	defer q.Release()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -103,7 +101,6 @@ func BenchmarkBaseGocqlGet(b *testing.B) {
 
 	stmt, _ := qb.Select("gocqlx_test.bench_person").Columns(benchPersonCols...).Where(qb.Eq("id")).Limit(1).ToCql()
 	q := session.Session.Query(stmt)
-	defer q.Release()
 
 	var p benchPerson
 
@@ -126,7 +123,6 @@ func BenchmarkGocqlxGet(b *testing.B) {
 
 	stmt, names := qb.Select("gocqlx_test.bench_person").Columns(benchPersonCols...).Where(qb.Eq("id")).Limit(1).ToCql()
 	q := session.Query(stmt, names)
-	defer q.Release()
 
 	var p benchPerson
 
@@ -154,7 +150,6 @@ func BenchmarkBaseGocqlSelect(b *testing.B) {
 
 	stmt, _ := qb.Select("gocqlx_test.bench_person").Columns(benchPersonCols...).Limit(100).ToCql()
 	q := session.Session.Query(stmt)
-	defer q.Release()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
@@ -181,7 +176,6 @@ func BenchmarkGocqlxSelect(b *testing.B) {
 
 	stmt, names := qb.Select("gocqlx_test.bench_person").Columns(benchPersonCols...).Limit(100).ToCql()
 	q := session.Query(stmt, names)
-	defer q.Release()
 
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {

@@ -3,7 +3,6 @@ package gocqlx
 import (
 	"context"
 	"fmt"
-	"time"
 
 	"github.com/apache/cassandra-gocql-driver/v2"
 )
@@ -34,28 +33,6 @@ func (s *Session) ContextBatch(ctx context.Context, bt gocql.BatchType) *Batch {
 	return &Batch{
 		Batch: s.Session.Batch(bt).WithContext(ctx),
 	}
-}
-
-// GetRequestTimeout returns time driver waits for single server response
-// This timeout is applied to preparing statement request and for query execution requests
-func (b *Batch) GetRequestTimeout() time.Duration {
-	return b.Batch.GetRequestTimeout()
-}
-
-// SetRequestTimeout sets time driver waits for server to respond
-// This timeout is applied to preparing statement request and for query execution requests
-func (b *Batch) SetRequestTimeout(timeout time.Duration) *Batch {
-	b.Batch.SetRequestTimeout(timeout)
-	return b
-}
-
-// SetHostID allows to define the host the query should be executed against. If the
-// host was filtered or otherwise unavailable, then the query will error. If an empty
-// string is sent, the default behavior, using the configured HostSelectionPolicy will
-// be used. A hostID can be obtained from HostInfo.HostID() after calling GetHosts().
-func (b *Batch) SetHostID(hostID string) *Batch {
-	b.Batch.SetHostID(hostID)
-	return b
 }
 
 // BindStruct binds query named parameters to values from arg using a mapper.
@@ -134,6 +111,30 @@ func (b *Batch) RetryPolicy(policy gocql.RetryPolicy) *Batch {
 // Only available for protocol 3 and above
 func (b *Batch) SerialConsistency(cons gocql.Consistency) *Batch {
 	b.Batch.SerialConsistency(cons)
+	return b
+}
+
+// Consistency sets the consistency level for this batch.
+func (b *Batch) Consistency(cons gocql.Consistency) *Batch {
+	b.Batch.Consistency(cons)
+	return b
+}
+
+// SetKeyspace will enable keyspace flag on the batch.
+// It allows to specify the keyspace that the batch should be executed in.
+//
+// Only available on protocol >= 5.
+func (b *Batch) SetKeyspace(keyspace string) *Batch {
+	b.Batch.SetKeyspace(keyspace)
+	return b
+}
+
+// WithNowInSeconds will enable the with now_in_seconds flag on the batch.
+// Also, it allows to define now_in_seconds value.
+//
+// Only available on protocol >= 5.
+func (b *Batch) WithNowInSeconds(now int) *Batch {
+	b.Batch.WithNowInSeconds(now)
 	return b
 }
 

@@ -79,6 +79,33 @@ func (q *Queryx) RoutingKey(routingKey []byte) *Queryx {
 	return q
 }
 
+// SetHostID allows to define the host the query should be executed against. If the
+// host was filtered or otherwise unavailable, then the query will error. If an empty
+// string is sent, the default behavior, using the configured HostSelectionPolicy will
+// be used. A hostID can be obtained from HostInfo.HostID() after calling GetHosts().
+func (q *Queryx) SetHostID(hostID string) *Queryx {
+	q.Query.SetHostID(hostID)
+	return q
+}
+
+// SetKeyspace will enable keyspace flag on the query.
+// It allows to specify the keyspace that the query should be executed in.
+//
+// Only available on protocol >= 5.
+func (q *Queryx) SetKeyspace(keyspace string) *Queryx {
+	q.Query.SetKeyspace(keyspace)
+	return q
+}
+
+// WithNowInSeconds will enable the with now_in_seconds flag on the query.
+// Also, it allows to define now_in_seconds value.
+//
+// Only available on protocol >= 5.
+func (q *Queryx) WithNowInSeconds(now int) *Queryx {
+	q.Query.WithNowInSeconds(now)
+	return q
+}
+
 // WithContext returns a shallow copy of q with its context
 // set to ctx.
 //

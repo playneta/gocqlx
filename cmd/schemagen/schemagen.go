@@ -38,8 +38,7 @@ var (
 	flagOutputFilePerm            = cmd.Uint64("output-file-perm", 0o644, "output file permissions")
 	flagUser                      = cmd.String("user", "", "user for password authentication")
 	flagPassword                  = cmd.String("password", "", "password for password authentication")
-	flagIgnoreNames               = cmd.String("ignore-names", "", "a comma-separated list of table, view or index names to ignore")
-	flagIgnoreIndexes             = cmd.Bool("ignore-indexes", false, "don't generate types for indexes")
+	flagIgnoreNames               = cmd.String("ignore-names", "", "a comma-separated list of table names to ignore")
 	flagQueryTimeout              = cmd.Duration("query-timeout", defaultQueryTimeout, "query timeout ( in seconds )")
 	flagConnectionTimeout         = cmd.Duration("connection-timeout", defaultConnectionTimeout, "connection timeout ( in seconds )")
 	flagSSLEnableHostVerification = cmd.Bool("ssl-enable-host-verification", false, "don't check server ssl certificate")
@@ -93,86 +92,69 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 		New("keyspace.tmpl").
 		Funcs(template.FuncMap{"camelize": camelize}).
 		Funcs(template.FuncMap{"mapScyllaToGoType": mapScyllaToGoType}).
+		Funcs(template.FuncMap{"typeInfoToCQL": typeInfoToCQL}).
 		Parse(keyspaceTmpl)
 	if err != nil {
 		log.Fatalln("unable to parse models template:", err)
 	}
 
-	// First of all, drop all indicies in metadata if option `-ignore-indexes`
-	// is specified.
-	if *flagIgnoreIndexes {
-		md.Indexes = nil
-	}
-
-	// Then remove all tables, views, and indices if their names match the
-	// filter.
+	// Remove all tables whose names match the filter.
 	ignoredNames := make(map[string]struct{})
 	for _, ignoredName := range strings.Split(*flagIgnoreNames, ",") {
 		ignoredNames[ignoredName] = struct{}{}
 	}
 	for name := range ignoredNames {
 		delete(md.Tables, name)
-		delete(md.Views, name)
-		delete(md.Indexes, name)
 	}
 
-	// Delete a user-defined type (UDT) if it is not used any column (i.e.
-	// table, view, or index).
+	// Delete a user-defined type (UDT) if it is not used by any table column.
 	orphanedTypes := make(map[string]struct{})
-	for userTypeName := range md.Types {
-		if !usedInTables(userTypeName, md.Tables) &&
-			!usedInViews(userTypeName, md.Views) &&
-			!usedInIndices(userTypeName, md.Indexes) {
+	for userTypeName := range md.UserTypes {
+		if !usedInTables(userTypeName, md.Tables) {
 			orphanedTypes[userTypeName] = struct{}{}
 		}
 	}
 	for typeName := range orphanedTypes {
-		delete(md.Types, typeName)
+		delete(md.UserTypes, typeName)
 	}
 
 	imports := make([]string, 0)
-	if len(md.Types) != 0 {
+	if len(md.UserTypes) != 0 {
 		imports = append(imports, "github.com/playneta/gocqlx")
 	}
 
 	updateImports := func(columns map[string]*gocql.ColumnMetadata) {
 		for _, c := range columns {
-			if (c.Type == "timestamp" || c.Type == "date" || c.Type == "time") && !existsInSlice(imports, "time") {
+			if (c.Validator == "timestamp" || c.Validator == "date" || c.Validator == "time") && !existsInSlice(imports, "time") {
 				imports = append(imports, "time")
 			}
-			if c.Type == "decimal" && !existsInSlice(imports, "gopkg.in/inf.v0") {
+			if c.Validator == "decimal" && !existsInSlice(imports, "gopkg.in/inf.v0") {
 				imports = append(imports, "gopkg.in/inf.v0")
 			}
-			if c.Type == "duration" && !existsInSlice(imports, "github.com/apache/cassandra-gocql-driver/v2") {
+			if c.Validator == "duration" && !existsInSlice(imports, "github.com/apache/cassandra-gocql-driver/v2") {
 				imports = append(imports, "github.com/apache/cassandra-gocql-driver/v2")
 			}
 		}
 	}
 
-	// Ensure that for each table, view, and index
+	// Ensure that for each table
 	//
 	// 1. ordered columns are sorted alphabetically;
-	// 2. imports are resolves for column types.
+	// 2. imports are resolved for column types.
+	//
+	// md.Tables also carries materialized views: getTableMetadata unions
+	// system_schema.tables with system_schema.views, so views arrive as ordinary
+	// TableMetadata with their own columns and keys.
 	for _, t := range md.Tables {
 		sort.Strings(t.OrderedColumns)
 		updateImports(t.Columns)
-	}
-	for _, v := range md.Views {
-		sort.Strings(v.OrderedColumns)
-		updateImports(v.Columns)
-	}
-	for _, i := range md.Indexes {
-		sort.Strings(i.OrderedColumns)
-		updateImports(i.Columns)
 	}
 
 	buf := &bytes.Buffer{}
 	data := map[string]interface{}{
 		"PackageName": *flagPkgname,
 		"Tables":      md.Tables,
-		"Views":       md.Views,
-		"Indexes":     md.Indexes,
-		"UserTypes":   md.Types,
+		"UserTypes":   md.UserTypes,
 		"Imports":     imports,
 	}
 
@@ -236,10 +218,10 @@ var userTypes = regexp.MustCompile(`(?:<|\s)(\w+)[>,]`) // match all types conta
 // provided tables.
 func usedInColumns(typeName string, columns map[string]*gocql.ColumnMetadata) bool {
 	for _, column := range columns {
-		if typeName == column.Type {
+		if typeName == column.Validator {
 			return true
 		}
-		matches := userTypes.FindAllStringSubmatch(column.Type, -1)
+		matches := userTypes.FindAllStringSubmatch(column.Validator, -1)
 		for _, s := range matches {
 			if s[1] == typeName {
 				return true
@@ -252,28 +234,6 @@ func usedInColumns(typeName string, columns map[string]*gocql.ColumnMetadata) bo
 // usedInTables tests whether the typeName is used in any of columns of the
 // provided tables.
 func usedInTables(typeName string, tables map[string]*gocql.TableMetadata) bool {
-	for _, table := range tables {
-		if usedInColumns(typeName, table.Columns) {
-			return true
-		}
-	}
-	return false
-}
-
-// usedInViews tests whether the typeName is used in any of columns of the
-// provided views.
-func usedInViews(typeName string, tables map[string]*gocql.ViewMetadata) bool {
-	for _, table := range tables {
-		if usedInColumns(typeName, table.Columns) {
-			return true
-		}
-	}
-	return false
-}
-
-// usedInIndices tests whether the typeName is used in any of columns of the
-// provided indices.
-func usedInIndices(typeName string, tables map[string]*gocql.IndexMetadata) bool {
 	for _, table := range tables {
 		if usedInColumns(typeName, table.Columns) {
 			return true

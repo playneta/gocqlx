@@ -1,0 +1,9 @@
+github.com/playneta/gocqlx
+
+This product includes software developed by ScyllaDB Ltd.
+(https://github.com/scylladb/gocqlx), licensed under the Apache License,
+Version 2.0.
+
+This is a modified fork of scylladb/gocqlx v3.0.4. It has been retargeted from
+the ScyllaDB gocql fork to github.com/apache/cassandra-gocql-driver/v2.
+See FORK.md for the complete list of modifications.

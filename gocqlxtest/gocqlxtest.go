@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/apache/cassandra-gocql-driver/v2"
+	"github.com/apache/cassandra-gocql-driver/v2/snappy"
 
 	"github.com/playneta/gocqlx"
 )
@@ -61,7 +62,7 @@ func CreateCluster() *gocql.ClusterConfig {
 
 	switch *flagCompressTest {
 	case "snappy":
-		cluster.Compressor = &gocql.SnappyCompressor{}
+		cluster.Compressor = &snappy.SnappyCompressor{}
 	case "":
 	default:
 		panic("invalid compressor: " + *flagCompressTest)

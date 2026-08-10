@@ -15,7 +15,6 @@ import (
 // Additional options can be passed to modify the insert query.
 func RewriteTable(session gocqlx.Session, dst, src *table.Table, transform func(map[string]interface{}), options ...func(q *gocqlx.Queryx)) error {
 	insert := dst.InsertQuery(session)
-	defer insert.Release()
 
 	// Apply query options
 	for _, o := range options {

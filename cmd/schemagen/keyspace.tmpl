@@ -36,60 +36,6 @@ var (
 )
 {{end}}
 
-{{with .Views}}
-// Materialized view models.
-var (
-{{- range .}}
-	{{$model_name := .ViewName | camelize}}
-		{{$model_name}} = table.New(table.Metadata {
-			Name:	"{{.ViewName}}",
-			Columns: []string{
-				{{- range .OrderedColumns}}
-					"{{.}}",
-				{{- end}}
-			},
-			PartKey: []string {
-				{{- range .PartitionKey}}
-					"{{.Name}}",
-				{{- end}}
-			},
-			SortKey: []string{
-				{{- range .ClusteringColumns}}
-					"{{.Name}}",
-				{{- end}}
-			},
-	})
-{{end}}
-)
-{{end}}
-
-{{with .Indexes}}
-// Index models.
-var (
-{{range .}}
-	{{$model_name := .Name | camelize}}
-		{{$model_name}}Index = table.New(table.Metadata {
-			Name:	"{{.Name}}_index",
-			Columns: []string{
-				{{- range .OrderedColumns}}
-					"{{.}}",
-				{{- end}}
-			},
-			PartKey: []string {
-				{{- range .PartitionKey}}
-					"{{.Name}}",
-				{{- end}}
-			},
-			SortKey: []string{
-				{{- range .ClusteringColumns}}
-					"{{.Name}}",
-				{{- end}}
-			},
-	})
-{{end}}
-)
-{{end}}
-
 {{with .UserTypes}}
 // User-defined types (UDT) structs.
 {{- range .}}
@@ -98,7 +44,7 @@ var (
 type {{$type_name}}UserType struct {
 	gocqlx.UDT
 {{- range $index, $element := .FieldNames}}
-	{{. | camelize}} {{(index $field_types $index) | mapScyllaToGoType}}
+	{{. | camelize}} {{(index $field_types $index) | typeInfoToCQL | mapScyllaToGoType}}
 {{- end}}
 }
 {{- end}}
@@ -110,36 +56,8 @@ type {{$type_name}}UserType struct {
 {{- $model_name := .Name | camelize}}
 type {{$model_name}}Struct struct {
 {{- range .Columns}}
-	{{- if not (eq .Type "empty") }}
-	{{.Name | camelize}} {{.Type | mapScyllaToGoType}}
-	{{- end}}
-{{- end}}
-}
-{{- end}}
-{{- end}}
-
-{{with .Views}}
-// View structs.
-{{- range .}}
-{{- $model_name := .ViewName | camelize}}
-type {{$model_name}}Struct struct {
-{{- range .Columns}}
-	{{- if not (eq .Type "empty") }}
-	{{.Name | camelize}} {{.Type | mapScyllaToGoType}}
-	{{- end}}
-{{- end}}
-}
-{{- end}}
-{{- end}}
-
-{{with .Indexes}}
-// Index structs.
-{{- range .}}
-{{- $model_name := .Name | camelize}}
-type {{$model_name}}IndexStruct struct {
-{{- range .Columns}}
-	{{- if not (eq .Type "empty") }}
-	{{.Name | camelize}} {{.Type | mapScyllaToGoType}}
+	{{- if not (eq .Validator "empty") }}
+	{{.Name | camelize}} {{.Validator | mapScyllaToGoType}}
 	{{- end}}
 {{- end}}
 }
