@@ -131,7 +131,11 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 			if c.Validator == "decimal" && !existsInSlice(imports, "gopkg.in/inf.v0") {
 				imports = append(imports, "gopkg.in/inf.v0")
 			}
-			if c.Validator == "duration" && !existsInSlice(imports, "github.com/apache/cassandra-gocql-driver/v2") {
+			// Substring match, not equality: uuid and timeuuid also reach Go through
+			// collections such as set<uuid>, which map to []gocql.UUID.
+			if (c.Validator == "duration" ||
+				strings.Contains(c.Validator, "uuid")) &&
+				!existsInSlice(imports, "github.com/apache/cassandra-gocql-driver/v2") {
 				imports = append(imports, "github.com/apache/cassandra-gocql-driver/v2")
 			}
 		}

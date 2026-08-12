@@ -58,8 +58,8 @@ type AlbumUserType struct {
 type PlaylistsStruct struct {
 	Album  AlbumUserType
 	Artist string
-	Id     [16]byte
-	SongId [16]byte
+	Id     gocql.UUID
+	SongId gocql.UUID
 	Title  string
 }
 type SongsStruct struct {
@@ -67,7 +67,7 @@ type SongsStruct struct {
 	Artist   string
 	Data     []byte
 	Duration gocql.Duration
-	Id       [16]byte
+	Id       gocql.UUID
 	Tags     []string
 	Title    string
 }

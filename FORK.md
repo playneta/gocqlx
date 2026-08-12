@@ -71,6 +71,54 @@ The two drivers model keyspace metadata differently:
   but UDT field types are only ever exposed as `TypeInfo`, so `typeInfoToCQL` renders them
   back to CQL from the type code before `mapScyllaToGoType` runs.
 
+### `cmd/schemagen` — `uuid` and `timeuuid` map to `gocql.UUID`, not `[16]byte`
+
+Upstream maps both to `[16]byte`, which the ScyllaDB driver accepted everywhere. The Apache
+driver does not: its `uuidUnmarshal` accepts `*[16]byte` for a 16-byte value but omits it from
+the `len(data) == 0` branch, which handles only `*UUID`, `*[]byte`, `*string` and
+`*interface{}`. Scanning a **NULL** `uuid` column into a `[16]byte` field therefore fails with:
+
+```
+can not unmarshal UUID into *[16]uint8. Accepted types: *UUID, *[]byte, *string, *interface{}.
+```
+
+Measured against both databases with both drivers, on a NULL and a populated scalar `uuid`:
+
+| Generated type | ScyllaDB driver | Apache driver, NULL | Apache driver, populated |
+|---|---|---|---|
+| `[16]byte` | ok | **fails** | ok |
+| `gocql.UUID` | ok | ok | ok |
+| `uuid.UUID` (google) | ok | **fails** | **fails** |
+
+The results are identical against ScyllaDB and Cassandra, so this is a property of the
+**driver**, not of the server — the old mapping worked because `scylladb/gocql` rewrote the
+pointer and delegated to a permissive generic helper, which the Apache driver replaced with a
+closed type switch. `gocql.UUID` is the only type that works in every combination, which is
+why it is now what `schemagen` emits.
+
+Only NULL **scalar** columns were ever affected. A NULL collection arrives as an empty slice
+and unmarshals no elements, so `set<uuid>` → `[][16]byte` never failed; collections change to
+`[]gocql.UUID` purely for consistency, because the element type comes from the same map.
+
+The driver import is added whenever a column type *contains* `uuid`, so collections are
+covered too.
+
+**Consequence for callers.** `gocql.UUID` and `google/uuid.UUID` are both *defined* types, so
+assigning between them needs an explicit conversion — the implicit
+`uuid.UUID` → unnamed `[16]byte` assignment that generated models used to allow is gone.
+Repository adapters must spell the conversion out in both directions:
+
+```go
+Id: gocql.UUID(entity.ID),   // ToSchema
+ID: uuid.UUID(record.Id),    // ToDomain
+```
+
+Rejected alternatives: forking the Apache driver to restore the missing `case *[16]byte` (two
+lines, but a second fork to maintain and permanent divergence from upstream for every service),
+and retargeting `*[16]byte` scan targets to `*gocql.UUID` inside `udtWrapValue` (works, and
+needs no caller changes, but hides a type substitution in the scan path and leaves generated
+models readable only through this fork).
+
 ### `queryx_wrap.go`, `batchx.go` — wrappers for methods the Apache driver added
 
 Upstream's `TestQueryxAllWrapped` / `TestBatchAllWrapped` require every embedded driver

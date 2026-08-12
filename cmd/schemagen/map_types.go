@@ -23,9 +23,14 @@ var types = map[string]string{
 	"text":      "string",
 	"time":      "time.Duration",
 	"timestamp": "time.Time",
-	"timeuuid":  "[16]byte",
+	// uuid and timeuuid map to gocql.UUID, not [16]byte. The driver's uuidUnmarshal accepts
+	// *[16]byte for a 16-byte value but omits it from the len(data) == 0 branch, so a NULL
+	// uuid column fails with "can not unmarshal UUID into *[16]uint8". *UUID is handled in
+	// both branches. gocql.UUID is defined as [16]byte, so scalar fields stay assignable
+	// either way; only slices of them change element type.
+	"timeuuid":  "gocql.UUID",
 	"tinyint":   "int8",
-	"uuid":      "[16]byte",
+	"uuid":      "gocql.UUID",
 	"varchar":   "string",
 	"varint":    "int64",
 }
