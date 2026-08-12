@@ -57,12 +57,18 @@ The two drivers model keyspace metadata differently:
 | `ColumnMetadata.Type` (schema string) | `ColumnMetadata.Validator` (schema string); `.Type` is a `TypeInfo` |
 | `UserTypeMetadata.FieldTypes` (`[]string`) | `[]TypeInfo` |
 
-- Materialized views still generate. `getTableMetadata` in the Apache driver unions
-  `system_schema.tables` with `system_schema.views`, so views arrive as ordinary
+- Materialized views still generate if a keyspace has any. `getTableMetadata` in the Apache
+  driver unions `system_schema.tables` with `system_schema.views`, so views arrive as ordinary
   `TableMetadata` complete with columns, partition key and clustering columns. They now
   land in the "Table models" block rather than a separate "Materialized view models"
   block — **the generated identifiers are unchanged**, since both spellings camelize the
   same view name.
+
+  The schemagen test no longer creates one. Cassandra 5.0 ships views disabled
+  (`materialized_views_enabled: false`) and kiss2 does not use them, so creating a view made
+  the suite unrunnable against a default-configured cluster. The view only ever demonstrated
+  that `-ignore-names` filters views as well as tables; `composers` still covers filtering a
+  table, and the golden fixture is unchanged because both names were ignored anyway.
 - Index models are gone, and the `-ignore-indexes` flag was removed with them. The Apache
   driver exposes no index metadata (`system_schema.indexes` is unread).
 - `type_info.go` is new. The Apache driver's `TypeInfo` implementations are unexported and
