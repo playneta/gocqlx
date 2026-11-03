@@ -514,3 +514,53 @@ func runSchemagen(t *testing.T, pkgname string) []byte {
 	}
 	return b
 }
+
+// opaqueTypeInfo stands in for a driver type of code TypeCustom that is not a
+// raw schema string, such as a vector: schemagen has no CQL notation for it.
+type opaqueTypeInfo struct{}
+
+func (opaqueTypeInfo) Type() gocql.Type                           { return gocql.TypeCustom }
+func (opaqueTypeInfo) Zero() interface{}                          { return nil }
+func (opaqueTypeInfo) Marshal(interface{}) ([]byte, error)        { return nil, nil }
+func (opaqueTypeInfo) Unmarshal(data []byte, v interface{}) error { return nil }
+
+func TestUserTypeFieldTypesFailsOnUnrenderableField(t *testing.T) {
+	userTypes := map[string]*gocql.UserTypeMetadata{
+		"embedding": {
+			Name:       "embedding",
+			FieldNames: []string{"label", "vector"},
+			FieldTypes: []gocql.TypeInfo{nativeTypeInfo(gocql.TypeText), opaqueTypeInfo{}},
+		},
+	}
+
+	_, err := userTypeFieldTypes(userTypes)
+	if err == nil {
+		t.Fatal("expected error")
+	}
+	if !strings.Contains(err.Error(), "embedding.vector") {
+		t.Fatalf("error does not name the field: %v", err)
+	}
+}
+
+func TestUserTypeFieldTypesRendersFields(t *testing.T) {
+	userTypes := map[string]*gocql.UserTypeMetadata{
+		"message_reaction": {
+			Name:       "message_reaction",
+			FieldNames: []string{"emoji", "created_at", "parent"},
+			FieldTypes: []gocql.TypeInfo{
+				nativeTypeInfo(gocql.TypeText),
+				nativeTypeInfo(gocql.TypeTimestamp),
+				unresolvedTypeInfo("frozen<other>"),
+			},
+		},
+	}
+
+	got, err := userTypeFieldTypes(userTypes)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := map[string][]string{"message_reaction": {"text", "timestamp", "frozen<other>"}}
+	if diff := cmp.Diff(want, got); diff != "" {
+		t.Fatalf("userTypeFieldTypes() mismatch (-want +got):\n%s", diff)
+	}
+}

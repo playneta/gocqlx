@@ -41,30 +41,49 @@ var cqlTypeNames = map[gocql.Type]string{
 }
 
 // typeInfoToCQL renders a TypeInfo back to its CQL schema notation so that it
-// can be fed to mapScyllaToGoType, which works on schema strings.
-func typeInfoToCQL(t gocql.TypeInfo) string {
+// can be fed to mapScyllaToGoType, which works on schema strings. It fails on a
+// type code it cannot render, such as a vector, instead of emitting a bogus Go type.
+func typeInfoToCQL(t gocql.TypeInfo) (string, error) {
 	switch v := t.(type) {
 	case gocql.CollectionType:
 		switch v.Type() {
 		case gocql.TypeMap:
-			return fmt.Sprintf("map<%s, %s>", typeInfoToCQL(v.Key), typeInfoToCQL(v.Elem))
-		case gocql.TypeList:
-			return fmt.Sprintf("list<%s>", typeInfoToCQL(v.Elem))
-		case gocql.TypeSet:
-			return fmt.Sprintf("set<%s>", typeInfoToCQL(v.Elem))
+			key, err := typeInfoToCQL(v.Key)
+			if err != nil {
+				return "", err
+			}
+			elem, err := typeInfoToCQL(v.Elem)
+			if err != nil {
+				return "", err
+			}
+			return fmt.Sprintf("map<%s, %s>", key, elem), nil
+		case gocql.TypeList, gocql.TypeSet:
+			elem, err := typeInfoToCQL(v.Elem)
+			if err != nil {
+				return "", err
+			}
+			name := "list"
+			if v.Type() == gocql.TypeSet {
+				name = "set"
+			}
+			return fmt.Sprintf("%s<%s>", name, elem), nil
 		}
 	case gocql.UDTTypeInfo:
-		return v.Name
+		return v.Name, nil
 	case gocql.TupleTypeInfo:
 		elems := make([]string, 0, len(v.Elems))
 		for _, e := range v.Elems {
-			elems = append(elems, typeInfoToCQL(e))
+			elem, err := typeInfoToCQL(e)
+			if err != nil {
+				return "", err
+			}
+			elems = append(elems, elem)
 		}
-		return "tuple<" + strings.Join(elems, ", ") + ">"
+		return "tuple<" + strings.Join(elems, ", ") + ">", nil
 	}
 
 	if name, ok := cqlTypeNames[t.Type()]; ok {
-		return name
+		return name, nil
 	}
 
 	// The driver cannot resolve a UDT referenced from a UDT field, such as
@@ -72,11 +91,9 @@ func typeInfoToCQL(t gocql.TypeInfo) string {
 	// string in an unexported string-kinded TypeInfo of type TypeCustom.
 	if t.Type() == gocql.TypeCustom {
 		if v := reflect.ValueOf(t); v.Kind() == reflect.String {
-			return v.String()
+			return v.String(), nil
 		}
 	}
 
-	// A type the driver knows but this table does not is a generation bug, not a
-	// runtime condition — fail loudly rather than emit a bogus Go type.
-	panic(fmt.Sprintf("schemagen: unsupported CQL type code %d", t.Type()))
+	return "", fmt.Errorf("typeInfoToCQL: unsupported CQL type code %d", t.Type())
 }

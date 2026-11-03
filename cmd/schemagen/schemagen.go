@@ -106,7 +106,10 @@ func renderTemplate(md *gocql.KeyspaceMetadata) ([]byte, error) {
 		delete(md.Tables, name)
 	}
 
-	userTypeFields := userTypeFieldTypes(md.UserTypes)
+	userTypeFields, err := userTypeFieldTypes(md.UserTypes)
+	if err != nil {
+		return nil, fmt.Errorf("render user type field types: %w", err)
+	}
 	removeUnusedUserTypes(md, userTypeFields)
 	if err := validateMapKeyTypes(md, userTypeFields); err != nil {
 		return nil, fmt.Errorf("validate map key types: %w", err)
@@ -216,16 +219,20 @@ func existsInSlice(s []string, v string) bool {
 // userTypeFieldTypes renders every UDT field type to CQL notation, keyed by
 // UDT name. The Apache driver exposes UDT field types only as TypeInfo, while
 // the type parser works on CQL strings, as column validators carry them.
-func userTypeFieldTypes(userTypes map[string]*gocql.UserTypeMetadata) map[string][]string {
+func userTypeFieldTypes(userTypes map[string]*gocql.UserTypeMetadata) (map[string][]string, error) {
 	fieldTypes := make(map[string][]string, len(userTypes))
 	for name, userType := range userTypes {
 		cqlTypes := make([]string, 0, len(userType.FieldTypes))
-		for _, fieldType := range userType.FieldTypes {
-			cqlTypes = append(cqlTypes, typeInfoToCQL(fieldType))
+		for i, fieldType := range userType.FieldTypes {
+			cqlType, err := typeInfoToCQL(fieldType)
+			if err != nil {
+				return nil, fmt.Errorf("userTypeFieldTypes: field %s.%s: %w", name, userType.FieldNames[i], err)
+			}
+			cqlTypes = append(cqlTypes, cqlType)
 		}
 		fieldTypes[name] = cqlTypes
 	}
-	return fieldTypes
+	return fieldTypes, nil
 }
 
 // removeUnusedUserTypes keeps the UDTs a table column references, directly or
